@@ -1,6 +1,6 @@
 # Portfolio Fundamentals Web App
 
-A ready-to-run web app that shows 10-year annual business fundamentals for your portfolio companies.
+This is a static web app that lets you view 10-year business fundamentals (annual) for your portfolio companies.
 
 ## What it shows
 - Revenue
@@ -14,18 +14,16 @@ A ready-to-run web app that shows 10-year annual business fundamentals for your 
 - Free Cash Flow
 
 ## Data source
-This app now fetches statement time-series from Yahoo Finance through the local backend (`/api/financials/:ticker`).
+The app pulls data from **Financial Modeling Prep** using your API key in the browser:
+- Income statement endpoint
+- Cash flow statement endpoint
 
 ## Run
 ```bash
-python server.py
+python -m http.server 8000
 ```
-Then open http://localhost:8000.
-
-## Why this fixes your 403
-- No Financial Modeling Prep key is needed anymore.
-- The dashboard avoids FMP 403/plan/key issues by using the backend Yahoo fetch route.
+Then open http://localhost:8000 and paste your FMP API key.
 
 ## Notes
-- Some non-US listings can have partial fundamentals in Yahoo.
-- If a metric is unavailable for a year, the bar appears empty.
+- If a company or field is missing in the API, charts can contain empty bars.
+- Foreign listings use exchange tickers (e.g. `ALV.DE`, `HEN3.DE`, `DNP.WA`).

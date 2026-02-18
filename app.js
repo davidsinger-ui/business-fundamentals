@@ -1,21 +1,41 @@
+const COMPANIES = [
+  ['Microsoft', 'MSFT'], ['Berkshire Hathaway', 'BRK-B'], ['Costco', 'COST'],
+  ['Alphabet', 'GOOGL'], ['Visa', 'V'], ['Amazon', 'AMZN'], ['S&P Global', 'SPGI'],
+  ['Apple', 'AAPL'], ['Meta', 'META'], ['Adobe', 'ADBE'], ['Nvidia', 'NVDA'],
+  ['Netflix', 'NFLX'], ['Disney', 'DIS'], ['MSCI', 'MSCI'], ["Moody's", 'MCO'],
+  ['Mastercard', 'MA'], ['American Express', 'AXP'], ['JPMorgan Chase', 'JPM'],
+  ['Allianz', 'ALV.DE'], ['Lockheed Martin', 'LMT'], ['Johnson & Johnson', 'JNJ'],
+  ['Beiersdorf', 'BEI.DE'], ['Henkel', 'HEN3.DE'], ['Procter & Gamble', 'PG'],
+  ["McDonald's", 'MCD'], ['Linde', 'LIN'], ['Chevron', 'CVX'], ['Rio Tinto', 'RIO'],
+  ['Realty Income REIT', 'O'], ['Dino Polska', 'DNP.WA'],
+];
+
 const METRICS = [
-  'Revenue',
-  'Operating Income',
-  'Operating Margin',
-  'Net Income',
-  'Diluted EPS',
-  'Cash from operating activities',
-  'Capex',
-  'Stock Based Compensation',
-  'Free Cash Flow',
+  ['Revenue', (i, c) => i.revenue],
+  ['Operating Income', (i, c) => i.operatingIncome],
+  ['Operating Margin', (i, c) => (i.revenue ? i.operatingIncome / i.revenue : null)],
+  ['Net Income', (i, c) => i.netIncome],
+  ['Diluted EPS', (i, c) => i.epsdiluted ?? i.eps],
+  ['Cash from operating activities', (i, c) => c.operatingCashFlow],
+  ['Capex', (i, c) => c.capitalExpenditure],
+  ['Stock Based Compensation', (i, c) => c.stockBasedCompensation],
+  ['Free Cash Flow', (i, c) => c.freeCashFlow ?? ((c.operatingCashFlow ?? 0) + (c.capitalExpenditure ?? 0))],
 ];
 
 const select = document.getElementById('company-select');
+const apiInput = document.getElementById('api-key');
 const loadBtn = document.getElementById('load-btn');
 const statusEl = document.getElementById('status');
 const nameEl = document.getElementById('company-name');
 const chartsEl = document.getElementById('charts');
 const charts = [];
+
+for (const [name, ticker] of COMPANIES) {
+  const option = document.createElement('option');
+  option.value = ticker;
+  option.textContent = `${name} (${ticker})`;
+  select.appendChild(option);
+}
 
 function destroyCharts() {
   charts.forEach((chart) => chart.destroy());
@@ -26,18 +46,17 @@ function destroyCharts() {
 function format(v, metric) {
   if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
   if (metric === 'Operating Margin') return `${(v * 100).toFixed(2)}%`;
-  if (metric === 'Diluted EPS') return Number(v).toFixed(2);
+  if (metric === 'Diluted EPS') return v.toFixed(2);
   const abs = Math.abs(v);
   if (abs >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
   if (abs >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
-  return Number(v).toFixed(2);
+  return v.toFixed(2);
 }
 
 async function fetchJson(url) {
   const res = await fetch(url);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || data.details || `HTTP ${res.status}`);
-  return data;
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
 function makeChart(metric, years, values, color) {
@@ -51,7 +70,10 @@ function makeChart(metric, years, values, color) {
 
   const chart = new Chart(canvas.getContext('2d'), {
     type: 'bar',
-    data: { labels: years, datasets: [{ data: values, backgroundColor: color }] },
+    data: {
+      labels: years,
+      datasets: [{ data: values, backgroundColor: color }],
+    },
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -60,55 +82,53 @@ function makeChart(metric, years, values, color) {
         tooltip: { callbacks: { label: (ctx) => format(ctx.parsed.y, metric) } },
       },
       scales: {
-        y: { ticks: { callback: (v) => format(v, metric) } },
+        y: {
+          ticks: { callback: (v) => format(v, metric) },
+        },
       },
     },
   });
   charts.push(chart);
 }
 
-async function loadCompanies() {
-  const companies = await fetchJson('/api/companies');
-  for (const c of companies) {
-    const option = document.createElement('option');
-    option.value = c.ticker;
-    option.textContent = `${c.name} (${c.ticker})`;
-    select.appendChild(option);
-  }
-}
-
 async function loadFundamentals() {
-  const ticker = select.value;
-  if (!ticker) {
-    statusEl.textContent = 'Choose a company first.';
+  const key = apiInput.value.trim();
+  if (!key) {
+    statusEl.textContent = 'Please enter your Financial Modeling Prep API key.';
     return;
   }
 
   destroyCharts();
+  const ticker = select.value;
   nameEl.textContent = select.options[select.selectedIndex].textContent;
   statusEl.textContent = 'Loading data...';
 
   try {
-    const data = await fetchJson(`/api/financials/${encodeURIComponent(ticker)}`);
-    const years = data.years || [];
+    const incomeUrl = `https://financialmodelingprep.com/api/v3/income-statement/${ticker}?period=annual&limit=10&apikey=${encodeURIComponent(key)}`;
+    const cashUrl = `https://financialmodelingprep.com/api/v3/cash-flow-statement/${ticker}?period=annual&limit=10&apikey=${encodeURIComponent(key)}`;
+
+    const [income, cash] = await Promise.all([fetchJson(incomeUrl), fetchJson(cashUrl)]);
+    if (!Array.isArray(income) || income.length === 0) throw new Error('No income statement data found.');
+    if (!Array.isArray(cash) || cash.length === 0) throw new Error('No cash flow data found.');
+
+    const cashByDate = Object.fromEntries(cash.map((x) => [x.date, x]));
+    const rows = income
+      .slice(0, 10)
+      .map((i) => ({ i, c: cashByDate[i.date] || {} }))
+      .reverse();
+
+    const years = rows.map((r) => r.i.calendarYear || r.i.date.slice(0, 4));
     const palette = ['#1d4ed8', '#0891b2', '#16a34a', '#9333ea', '#dc2626', '#d97706'];
 
-    METRICS.forEach((metric, idx) => {
-      makeChart(metric, years, data.metrics[metric] || [], palette[idx % palette.length]);
+    METRICS.forEach(([metric, getter], idx) => {
+      const values = rows.map(({ i, c }) => getter(i, c));
+      makeChart(metric, years, values, palette[idx % palette.length]);
     });
 
-    statusEl.textContent = `Loaded ${years.length} annual periods for ${ticker}.`;
+    statusEl.textContent = `Loaded ${rows.length} annual periods for ${ticker}.`;
   } catch (err) {
     statusEl.textContent = `Error: ${err.message}`;
   }
 }
 
 loadBtn.addEventListener('click', loadFundamentals);
-window.addEventListener('DOMContentLoaded', async () => {
-  try {
-    await loadCompanies();
-    await loadFundamentals();
-  } catch (err) {
-    statusEl.textContent = `Error: ${err.message}`;
-  }
-});
