@@ -27,3 +27,9 @@ Then open http://localhost:8000 and paste your FMP API key.
 ## Notes
 - If a company or field is missing in the API, charts can contain empty bars.
 - Foreign listings use exchange tickers (e.g. `ALV.DE`, `HEN3.DE`, `DNP.WA`).
+
+
+## Troubleshooting HTTP 403
+- A 403 response from Financial Modeling Prep usually means the API key is invalid, expired, out of quota, or your plan does not include the endpoint.
+- This app now tries both FMP `stable` and `v3` annual statement endpoints automatically.
+- Re-check your key in the FMP dashboard, confirm plan access, and retry.
