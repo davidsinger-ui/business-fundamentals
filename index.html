@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portfolio Fundamentals</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Portfolio Fundamentals Dashboard</h1>
+      <p>Revenue, margins, earnings, cash flow, capex and SBC over the last 10 years.</p>
+    </header>
+
+    <section class="toolbar">
+      <label>
+        Financial Modeling Prep API Key
+        <input id="api-key" placeholder="Enter Financial Modeling Prep API key" />
+      </label>
+      <label>
+        Company
+        <select id="company-select"></select>
+      </label>
+      <button id="load-btn">Load Fundamentals</button>
+    </section>
+
+    <section>
+      <h2 id="company-name"></h2>
+      <p id="status"></p>
+    </section>
+
+    <section id="charts" class="charts-grid"></section>
+
+    <script src="app.js"></script>
+  </body>
+</html>
